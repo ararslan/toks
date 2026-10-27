@@ -62,7 +62,9 @@
 
 #if defined(_WIN32)
 #  include <windows.h>
-#  pragma comment(lib, "synchronization.lib")
+#  if defined(_MSC_VER)
+#    pragma comment(lib, "synchronization.lib")
+#  endif
 #else
 #  include <pthread.h>
 #  include <sched.h>

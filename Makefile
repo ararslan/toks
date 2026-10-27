@@ -64,6 +64,11 @@ endif
 # threads exist only in src/par (toks_par, SPEC §2.4); the core is compiled without them
 ifneq ($(OS),windows)
   PTHREAD := -pthread
+else ifneq ($(findstring mingw,$(TARGET)),)
+  ifneq ($(findstring gcc,$(shell $(CC) --version)),)
+    # msvc can link to synchronization.lib using pragma comment but mingw with gcc needs an explicit -l flag
+    PTHREAD := -lsynchronization
+  endif
 endif
 $(BUILD_DIR)/obj/src/par/%.o: XFLAGS := $(PTHREAD)
 
