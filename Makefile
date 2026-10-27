@@ -92,12 +92,17 @@ endif
 
 LIB       := $(BUILD_DIR)/libtoks.a
 ifeq ($(OS),macos)
-  SHLIB   := $(BUILD_DIR)/libtoks.dylib
+  DLEXT   := dylib
   SHFLAGS := -dynamiclib
 else
-  SHLIB   := $(BUILD_DIR)/libtoks.so
   SHFLAGS := -shared
+  ifeq ($(OS),windows)
+    DLEXT := dll
+  else
+    DLEXT := so
+  endif
 endif
+SHLIB     := $(BUILD_DIR)/libtoks.$(DLEXT)
 
 TEST_COMMON := tests/common/guard.c tests/common/abicheck_$(ISA).S
 TEST_SRCS   := $(wildcard tests/c/*.c)
