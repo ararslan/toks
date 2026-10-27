@@ -82,6 +82,11 @@ extern int __ulock_wait(uint32_t op, void *addr, uint64_t value, uint32_t timeou
 extern int __ulock_wake(uint32_t op, void *addr, uint64_t wake_value);
 #    define TOKS_UL_COMPARE_AND_WAIT 1u
 #    define TOKS_ULF_NO_ERRNO        0x01000000u
+#  elif defined(__FreeBSD__)
+#    include <pthread_np.h>
+#    include <sys/umtx.h>
+#    include <sys/param.h>
+#    include <sys/cpuset.h>
 #  endif
 #endif
 
@@ -223,6 +228,8 @@ static void addr_wait(_Atomic uint32_t *a, uint32_t v)   /* returns when *a != v
     __ulock_wait(TOKS_UL_COMPARE_AND_WAIT | TOKS_ULF_NO_ERRNO, (void *)a, v, 0u);
 #elif defined(_WIN32)
     WaitOnAddress((volatile VOID *)a, &v, sizeof v, INFINITE);
+#elif defined(__FreeBSD__)
+    _umtx_op((void *)a, UMTX_OP_WAIT_UINT_PRIVATE, (unsigned long)v, NULL, 0);
 #else
     (void)a; (void)v;
     sched_yield();
@@ -237,6 +244,8 @@ static void addr_wake(_Atomic uint32_t *a)                /* the one thread wait
     __ulock_wake(TOKS_UL_COMPARE_AND_WAIT | TOKS_ULF_NO_ERRNO, (void *)a, 0u);
 #elif defined(_WIN32)
     WakeByAddressSingle((PVOID)a);
+#elif defined(__FreeBSD__)
+    _umtx_op((void *)a, UMTX_OP_WAKE_PRIVATE, 1, NULL, 0);
 #else
     (void)a;
 #endif
@@ -247,6 +256,8 @@ typedef struct topo {
     uint32_t n_cpu, n_fast;
 #if defined(__linux__)
     cpu_set_t fast;                        /* the fastest class, when the process may run on several */
+#elif defined(__FreeBSD__)
+    cpuset_t fast;
 #endif
 } topo;
 
@@ -306,6 +317,17 @@ static void topo_read(topo *t)
             break;
         }
     }
+#elif defined(__FreeBSD__)
+    cpuset_t all;
+    CPU_ZERO(&all);
+    CPU_ZERO(&t->fast);
+    if (cpuset_getaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1, sizeof all, &all) != 0) {
+        n = sysconf(_SC_NPROCESSORS_ONLN);
+    } else {
+        n = CPU_COUNT(&all);
+        t->fast = all;
+    }
+    t->n_fast = (uint32_t)(n < 1 ? 1 : n);
 #else
     n = sysconf(_SC_NPROCESSORS_ONLN);
     t->n_fast = (uint32_t)(n < 1 ? 1 : n);
@@ -340,7 +362,7 @@ static int thr_start(thr_t *t, slot *s, const topo *tp, int fast)
 {
     pthread_attr_t at;
     if (pthread_attr_init(&at) != 0) { return -1; }
-#if defined(__linux__)
+#if defined(__linux__) || defined(__FreeBSD__)
     if (fast && tp->n_fast < tp->n_cpu) { pthread_attr_setaffinity_np(&at, sizeof tp->fast, &tp->fast); }
 #elif defined(__APPLE__)
     (void)tp; (void)fast;

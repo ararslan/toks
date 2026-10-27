@@ -121,7 +121,14 @@ uint64_t toks_cpu_features(void)
 uint64_t toks_cpu_features(void)
 {
     uint64_t f = 0;
+#if defined(__FreeBSD__)
+    unsigned long h;
+    int rc = elf_aux_info(AT_HWCAP, &h, sizeof(unsigned long));
+    if (rc != 0)
+        return f;
+#else
     unsigned long h = getauxval(AT_HWCAP);
+#endif
     if (h & HWCAP_ASIMD)   f |= TOKS_ARM64_NEON;
     if (h & HWCAP_CRC32)   f |= TOKS_ARM64_CRC32;
     if (h & HWCAP_ASIMDDP) f |= TOKS_ARM64_DOTPROD;
