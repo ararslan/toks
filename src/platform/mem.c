@@ -1,7 +1,10 @@
 /* mem.c: platform load-time memory (docs/notes/c-core.md §mem.c.1) */
 #if !defined(_WIN32)
-#  define _DEFAULT_SOURCE 1     /* madvise, MAP_ANONYMOUS: glibc hides them under -std=c17 */
+#  define _DEFAULT_SOURCE 1
 #  define _DARWIN_C_SOURCE 1
+#  if defined(__linux__)
+#    define _GNU_SOURCE 1      /* madvise, MAP_ANONYMOUS: glibc hides them under -std=c17 */
+#  endif
 #endif
 #include "core.h"
 
